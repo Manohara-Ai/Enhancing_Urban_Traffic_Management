@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Simulation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script>
+        function startSimulation() {
+            fetch("/simulate", { method: "POST" })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("simulationTime").innerText = "Time: " + data.time + " minutes";
+                let resultsDiv = document.getElementById("simulationResults");
+                resultsDiv.innerHTML = "<h3>Vehicle Counts:</h3>";
+
+                for (let lane in data.vehicles) {
+                    let laneNumber = parseInt(lane) + 1;
+                    resultsDiv.innerHTML += `<p>🚦 Lane ${laneNumber}: ${data.vehicles[lane]} vehicles 
+                        (🚨 ${data.high_priority[lane]} high-priority)</p>`;
+                }
+            });
+        }
+
+        function generateFunction(index) {
+            fetch("/generate_function")
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("functionInput" + index).value = data.function;
+            });
+        }
+
+        function updateSimulation(event) {
+            event.preventDefault();
+
+            let formData = new FormData(document.getElementById("simulationForm"));
+
+            fetch("/", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    document.getElementById("updateMessage").innerText = data.message;
+                    showUpdateMessage();
+                }
+            })
+            .catch(error => console.error("Error:", error));
+        }
+
+        function simulateHour() {
+            fetch("/simulate_hour", { method: "POST" })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            });
+        }
+
+        function updateLaneInputs() {
+            let lanes = parseInt(document.getElementById("lanes").value);
+            let functionInputsDiv = document.getElementById("functionInputs");
+            functionInputsDiv.innerHTML = "";
+
+            for (let i = 0; i < lanes; i++) {
+                functionInputsDiv.innerHTML += `
+                    <label>Lane ${i + 1} Traffic Function:</label>
+                    <input type="text" id="functionInput${i}" name="function[${i}]" required>
+                    <button type="button" onclick="generateFunction(${i})">Generate Random Function</button><br>
+
+                    <label>Lane ${i + 1} High-Priority Vehicles:</label>
+                    <input type="number" id="highPriority${i}" name="high_priority[${i}]" value="0" min="0"><br><br>
+                `;
+            }
+        }
+
+        function showUpdateMessage() {
+            let messageDiv = document.getElementById("updateMessage");
+            messageDiv.style.display = "block";
+
+            setTimeout(function() {
+                messageDiv.style.display = "none";
+            }, 3000);
+        }
+    </script>
+</head>
+<body>
+    <h1>Traffic Simulation</h1>
+
+    <form id="simulationForm" onsubmit="updateSimulation(event)">
+        <label for="lanes">Number of Lanes:</label>
+        <input type="number" id="lanes" name="lanes" value="{{ lanes }}" min="1" max="6" required oninput="updateLaneInputs()">
+        
+        <div id="functionInputs">
+            {% for i in range(lanes) %}
+                <label>Lane {{ i+1 }} Traffic Function:</label>
+                <input type="text" id="functionInput{{ i }}" name="function[{{ i }}]" value="{{ functions.get(i, '') }}" required>
+                <button type="button" onclick="generateFunction({ i })">Generate Random Function</button><br>
+
+                <label>Lane {{ i+1 }} High-Priority Vehicles:</label>
+                <input type="number" id="highPriority{{ i }}" name="high_priority[{{ i }}]" value="{{ high_priority_vehicles.get(i, 0) }}" min="0"><br><br>
+            {% endfor %}
+        </div>               
+
+        <button type="submit">Update Simulation</button>
+    </form>
+
+    <div id="updateMessage" style="display: none; color: green; font-weight: bold;">
+        Simulation updated!
+    </div>
+
+    <h2 id="simulationTime">Time: 0 minutes</h2>
+    <button onclick="startSimulation()">Run Simulation (Next Minute)</button>
+    <button onclick="simulateHour()">Simulate 1 Hour & Log CSV</button>
+    <div id="simulationResults"></div>
+</body>
+</html>
